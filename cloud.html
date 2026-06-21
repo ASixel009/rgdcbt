@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDG 205 Cloud — PDF Library</title>
+<style>
+  :root{
+    --black: #050505;
+    --black-soft: #0d0d0e;
+    --ink: #141416;
+    --glass-1: rgba(255,255,255,0.06);
+    --glass-2: rgba(255,255,255,0.10);
+    --glass-border: rgba(255,255,255,0.14);
+    --glass-border-strong: rgba(255,255,255,0.28);
+    --white: #f5f5f7;
+    --white-dim: rgba(245,245,247,0.62);
+    --white-faint: rgba(245,245,247,0.38);
+    --hairline: rgba(255,255,255,0.09);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* sparing semantic accents only — kept out of the base palette */
+    --green: #34d399;
+    --green-glow: rgba(52,211,153,0.18);
+    --red: #f87171;
+    --red-glow: rgba(248,113,113,0.18);
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    font-family: "Neue Haas Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--black);
+    color: var(--white);
+    min-height:100vh;
+    overflow-x:hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .field{
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events:none;
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 0%, rgba(255,255,255,0.07), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 15%, rgba(255,255,255,0.05), transparent 55%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(255,255,255,0.045), transparent 60%),
+      var(--black);
+  }
+  .field::before{
+    content:"";
+    position:absolute; inset:-10%;
+    background-image:
+      repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 90px),
+      repeating-linear-gradient(25deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 70px);
+    opacity:0.5;
+    animation: drift 60s linear infinite;
+  }
+  @keyframes drift{ 0%{transform:translate(0,0);} 100%{transform:translate(-90px,-70px);} }
+  .grain{
+    position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection{ background: rgba(255,255,255,0.25); }
+  a{ text-decoration:none; color:inherit; }
+
+  .glass{
+    position:relative;
+    background: linear-gradient(155deg, var(--glass-2), var(--glass-1));
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.18) inset,
+      0 -1px 0 rgba(0,0,0,0.4) inset,
+      0 24px 60px -20px rgba(0,0,0,0.7),
+      0 4px 16px rgba(0,0,0,0.4);
+  }
+  .glass::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:50%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), transparent);
+    pointer-events:none;
+  }
+
+  .wrap{ max-width: 1040px; margin:0 auto; padding: 0 24px; position:relative; z-index:2; }
+  @media (max-width:600px){ .wrap{ padding:0 18px; } }
+
+  /* ============ LOADING OVERLAY ============ */
+  #loadingOverlay{
+    position:fixed; inset:0; z-index:100;
+    background: var(--black);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:22px;
+    transition: opacity 0.5s var(--ease), visibility 0.5s var(--ease);
+  }
+  #loadingOverlay.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+
+  .loader-ring{
+    width:54px; height:54px; position:relative;
+  }
+  .loader-ring::before, .loader-ring::after{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    border: 2.5px solid transparent;
+  }
+  .loader-ring::before{
+    border-top-color: var(--white);
+    border-right-color: rgba(255,255,255,0.25);
+    animation: spin 1s linear infinite;
+  }
+  .loader-ring::after{
+    inset: 10px;
+    border-bottom-color: var(--white-faint);
+    animation: spin 1.4s linear infinite reverse;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .loader-text{
+    font-size:12.5px; letter-spacing:0.18em; text-transform:uppercase;
+    color: var(--white-faint); font-weight:600;
+  }
+  .loader-text .count{ color: var(--white); font-variant-numeric:tabular-nums; }
+
+  /* ============ HEADER ============ */
+  header.site{ position:relative; z-index:2; padding: 26px 0; }
+  .header-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .wordmark{ display:flex; align-items:center; gap:12px; }
+  .wordmark .dot{
+    width:8px; height:8px; border-radius:50%; background: var(--white);
+    box-shadow: 0 0 16px rgba(255,255,255,0.7);
+    animation: pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1; transform:scale(1);} 50%{opacity:0.45; transform:scale(0.78);} }
+  .wordmark span{ font-size:13px; letter-spacing:0.22em; text-transform:uppercase; color:var(--white-dim); font-weight:500; }
+
+  .header-actions{ display:flex; gap:10px; }
+  .btn{
+    appearance:none; border:none; cursor:pointer; font-family:inherit;
+    border-radius:999px; font-weight:700; letter-spacing:0.01em;
+    transition: all 0.22s var(--ease);
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    font-size:13.5px;
+  }
+  .btn-primary{ padding:12px 22px; background:var(--white); color:#050505; box-shadow:0 10px 28px -10px rgba(255,255,255,0.4); }
+  .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 14px 34px -8px rgba(255,255,255,0.55); }
+  .btn-ghost{ padding:11px 20px; background:rgba(255,255,255,0.05); color:var(--white); border:1px solid var(--glass-border); }
+  .btn-ghost:hover{ background:rgba(255,255,255,0.1); border-color:var(--glass-border-strong); }
+
+  /* ============ HERO ============ */
+  .hero{ padding: 36px 0 40px; text-align:center; }
+  .hero h1{
+    font-size: clamp(32px, 5.5vw, 50px); font-weight:700; letter-spacing:-0.02em; line-height:1.06;
+    background: linear-gradient(180deg, #ffffff 10%, rgba(255,255,255,0.55));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero p{ margin-top:14px; font-size:15.5px; color:var(--white-dim); max-width:480px; margin-left:auto; margin-right:auto; line-height:1.6; }
+
+  /* ============ SEARCH ============ */
+  .search-panel{ padding: 22px; margin-bottom:24px; }
+  .search-row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .search-input-wrap{ flex:1; min-width:220px; position:relative; }
+  .search-input{
+    width:100%; padding: 14px 18px 14px 44px; border-radius:999px;
+    background: rgba(255,255,255,0.04); border:1px solid var(--hairline);
+    color:var(--white); font-family:inherit; font-size:14.5px; outline:none;
+    transition: all 0.2s var(--ease);
+  }
+  .search-input:focus{ border-color:var(--glass-border-strong); background:rgba(255,255,255,0.07); }
+  .search-input::placeholder{ color:var(--white-faint); }
+  .search-icon{
+    position:absolute; left:17px; top:50%; transform:translateY(-50%);
+    width:15px; height:15px; opacity:0.4; pointer-events:none;
+  }
+  .filter-select{
+    padding: 14px 18px; border-radius:999px;
+    background: rgba(255,255,255,0.04); border:1px solid var(--hairline);
+    color:var(--white-dim); font-family:inherit; font-size:13.5px; cursor:pointer; outline:none;
+  }
+
+  .result-meta{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; font-size:13px; color:var(--white-faint); }
+  .result-meta strong{ color:var(--white); }
+
+  /* ============ DOCUMENT GRID ============ */
+  .doc-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:16px; margin-bottom:40px; }
+  @media (max-width:680px){ .doc-grid{ grid-template-columns:1fr; } }
+
+  .doc-card{
+    padding: 22px 22px; display:flex; flex-direction:column;
+    transition: all 0.25s var(--ease); cursor:pointer;
+  }
+  .doc-card:hover{ border-color:var(--glass-border-strong); transform:translateY(-2px); }
+  .doc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; }
+  .doc-module{
+    font-size:10.5px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--white-faint); border:1px solid var(--glass-border); border-radius:999px; padding:5px 12px;
+    white-space:nowrap;
+  }
+  .doc-card h3{ font-size:15.5px; font-weight:700; line-height:1.4; margin-bottom:8px; }
+  .doc-card .topic{ font-size:12.5px; color:var(--white-faint); margin-bottom:16px; flex:1; }
+  .doc-foot{ display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid var(--hairline); font-size:11.5px; color:var(--white-faint); }
+  .doc-foot .dl{ font-weight:700; color:var(--white); display:flex; align-items:center; gap:6px; }
+
+  /* ============ EMPTY / ERROR STATES ============ */
+  .state-box{ text-align:center; padding: 60px 24px; }
+  .state-box .icon{ font-size:34px; margin-bottom:14px; opacity:0.5; }
+  .state-box h3{ font-size:17px; font-weight:700; margin-bottom:8px; }
+  .state-box p{ font-size:13.5px; color:var(--white-faint); max-width:340px; margin:0 auto; line-height:1.5; }
+
+  /* ============ SUGGESTION FORM ============ */
+  .suggest-section{ padding: 40px 0 70px; }
+  .suggest-panel{ padding: 36px 32px; }
+  @media (max-width:560px){ .suggest-panel{ padding:26px 22px; } }
+  .suggest-head{ margin-bottom:24px; }
+  .suggest-head h2{ font-size:21px; font-weight:700; margin-bottom:8px; }
+  .suggest-head p{ font-size:13.5px; color:var(--white-faint); line-height:1.55; }
+  .suggest-head .email-line{ margin-top:8px; font-size:12.5px; color:var(--white-faint); }
+  .suggest-head .email-line a{ color:var(--white-dim); text-decoration:underline; text-underline-offset:2px; }
+
+  .form-row{ display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .form-field{ flex:1; min-width:160px; display:flex; flex-direction:column; gap:7px; }
+  .form-field label{ font-size:11.5px; color:var(--white-faint); text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
+  .form-field input, .form-field select, .form-field textarea{
+    padding: 13px 16px; border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04); border:1px solid var(--hairline);
+    color: var(--white); font-family:inherit; font-size:14px; outline:none;
+    transition: all 0.2s var(--ease); resize:vertical;
+  }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus{
+    border-color: var(--glass-border-strong); background: rgba(255,255,255,0.07);
+  }
+  .form-field textarea{ min-height:110px; }
+  .form-field input::placeholder, .form-field textarea::placeholder{ color: var(--white-faint); }
+
+  .form-submit-row{ display:flex; align-items:center; gap:16px; margin-top:18px; flex-wrap:wrap; }
+
+  /* status banner — the one place red/green show up */
+  .form-status{
+    display:none; align-items:center; gap:10px;
+    padding: 12px 18px; border-radius:999px; font-size:13px; font-weight:600;
+  }
+  .form-status.show{ display:inline-flex; }
+  .form-status.success{ background: var(--green-glow); color: var(--green); border:1px solid rgba(52,211,153,0.35); }
+  .form-status.error{ background: var(--red-glow); color: var(--red); border:1px solid rgba(248,113,113,0.35); }
+  .form-status .led{ width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; flex-shrink:0; }
+
+  /* ============ FOOTER ============ */
+  footer{ position:relative; z-index:2; padding: 30px 24px 36px; text-align:center; border-top:1px solid var(--hairline); }
+  footer p{ font-size:11.5px; color: var(--white-faint); line-height:1.8; }
+  footer a{ color: var(--white-dim); text-decoration:underline; text-underline-offset:2px; }
+
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- ============ LOADING OVERLAY ============ -->
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text">Loading library<span class="count" id="loadCount"> · 0%</span></div>
+</div>
+
+<div class="field"></div>
+<div class="grain"></div>
+
+<header class="site">
+  <div class="wrap header-row">
+    <div class="wordmark"><div class="dot"></div><span>RDG 205 · Cloud</span></div>
+    <div class="header-actions">
+      <a href="./RDG205.html" class="btn btn-ghost">Back to course</a>
+      <a href="./admin.html" class="btn btn-ghost">Admin</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>PDF library.</h1>
+    <p>Search and download course materials, notes, and references for RDG 205 — all in one place.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="glass search-panel">
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="Search by title, topic, or keyword…">
+        </div>
+        <select class="filter-select" id="moduleFilter">
+          <option value="">All modules</option>
+          <option value="1">01 — Conductors & Semiconductors</option>
+          <option value="2">02 — Energy & Energy Transfer</option>
+          <option value="3">03 — Radioactivity & Half-Life</option>
+          <option value="4">04 — Bohr's Atomic Model</option>
+          <option value="5">05 — X-ray Production</option>
+          <option value="6">06 — Photon Interactions</option>
+          <option value="7">07 — Quantities & Dosimetry</option>
+          <option value="8">08 — Radiation Protection</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="result-meta">
+      <span id="resultCount"><strong>0</strong> documents</span>
+      <span id="resultHint"></span>
+    </div>
+
+    <div class="doc-grid" id="docGrid"></div>
+
+    <div class="state-box hidden" id="emptyState">
+      <div class="icon">○</div>
+      <h3>No documents yet</h3>
+      <p>Nothing's been uploaded to the library yet. Check back soon, or suggest one below.</p>
+    </div>
+
+    <div class="state-box hidden" id="errorState">
+      <div class="icon">!</div>
+      <h3>Couldn't load the library</h3>
+      <p>Something went wrong reaching the database. Try refreshing the page.</p>
+    </div>
+  </div>
+</section>
+
+<section class="suggest-section">
+  <div class="wrap">
+    <div class="glass suggest-panel">
+      <div class="suggest-head">
+        <h2>Suggest a PDF, improvement, or new course</h2>
+        <p>Missing a document? Found something that could be better? Want a course added? Let us know below.</p>
+        <div class="email-line">Or email directly: <a href="mailto:abdulsalambolaji009@gmail.com">abdulsalambolaji009@gmail.com</a></div>
+      </div>
+
+      <form id="suggestForm">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="sName">Name (optional)</label>
+            <input type="text" id="sName" placeholder="Your name">
+          </div>
+          <div class="form-field">
+            <label for="sEmail">Email (optional)</label>
+            <input type="email" id="sEmail" placeholder="you@example.com">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="sCategory">Type</label>
+            <select id="sCategory">
+              <option value="pdf">Suggest a PDF</option>
+              <option value="improvement">Suggest an improvement</option>
+              <option value="course">Suggest a new course</option>
+              <option value="general">Something else</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="sMessage">Message</label>
+            <textarea id="sMessage" placeholder="Tell us what you'd like to see…" required></textarea>
+          </div>
+        </div>
+
+        <div class="form-submit-row">
+          <button type="submit" class="btn btn-primary" id="suggestSubmitBtn">Send suggestion →</button>
+          <div class="form-status" id="formStatus"><span class="led"></span><span id="formStatusText"></span></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Made by a student, for RDG 205 students.<br>
+  Department of Radiography &amp; Radiation Sciences · Federal University Oye-Ekiti<br>
+  Questions? <a href="mailto:abdulsalambolaji009@gmail.com">abdulsalambolaji009@gmail.com</a></p>
+</footer>
+
+<script>
+  // ============================================================
+  // CONFIG — public-safe values only (anon key is designed to be
+  // exposed in browser code; RLS policies control what it can touch)
+  // ============================================================
+  const SUPABASE_URL = "https://ttqzunjjicflxxvvmvnr.supabase.co";
+  const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+
+  let ALL_DOCS = [];
+
+  // ============================================================
+  // LOADING OVERLAY
+  // ============================================================
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadCount = document.getElementById('loadCount');
+
+  function setLoadProgress(pct){
+    loadCount.textContent = ` · ${pct}%`;
+  }
+  function hideLoader(){
+    setLoadProgress(100);
+    setTimeout(() => loadingOverlay.classList.add('hide'), 250);
+  }
+
+  // ============================================================
+  // FETCH DOCUMENTS (Supabase REST, read-only via anon key + RLS)
+  // ============================================================
+  async function fetchDocuments(){
+    setLoadProgress(20);
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/documents?select=*&order=uploaded_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        }
+      });
+      setLoadProgress(70);
+      if(!res.ok) throw new Error('Fetch failed: ' + res.status);
+      const data = await res.json();
+      setLoadProgress(100);
+      return data;
+    } catch(err){
+      console.error(err);
+      return null; // signals error state
+    }
+  }
+
+  function moduleLabel(n){
+    const labels = {
+      1:"Conductors & Semiconductors", 2:"Energy & Energy Transfer", 3:"Radioactivity & Half-Life",
+      4:"Bohr's Atomic Model", 5:"X-ray Production", 6:"Photon Interactions",
+      7:"Quantities & Dosimetry", 8:"Radiation Protection"
+    };
+    return labels[n] || 'General';
+  }
+
+  function formatSize(bytes){
+    if(!bytes) return '';
+    const mb = bytes / (1024*1024);
+    return mb < 1 ? `${Math.round(bytes/1024)} KB` : `${mb.toFixed(1)} MB`;
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+  const docGrid = document.getElementById('docGrid');
+  const emptyState = document.getElementById('emptyState');
+  const errorState = document.getElementById('errorState');
+  const resultCount = document.getElementById('resultCount');
+
+  function renderDocs(docs){
+    docGrid.innerHTML = '';
+    emptyState.classList.add('hidden');
+    errorState.classList.add('hidden');
+
+    resultCount.innerHTML = `<strong>${docs.length}</strong> document${docs.length===1?'':'s'}`;
+
+    if(docs.length === 0){
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    docs.forEach(doc => {
+      const card = document.createElement('a');
+      card.className = 'glass doc-card';
+      card.href = doc.public_url || '#';
+      card.target = '_blank';
+      card.rel = 'noopener';
+      card.innerHTML = `
+        <div class="doc-top">
+          <span class="doc-module">Module ${String(doc.module_number||'—').padStart(2,'0')}</span>
+        </div>
+        <h3>${escapeHtml(doc.title)}</h3>
+        <div class="topic">${escapeHtml(doc.topic || moduleLabel(doc.module_number))}</div>
+        <div class="doc-foot">
+          <span>${doc.page_count ? doc.page_count + ' pages' : ''}${doc.page_count && doc.file_size_bytes ? ' · ' : ''}${formatSize(doc.file_size_bytes)}</span>
+          <span class="dl">Open ↗</span>
+        </div>
+      `;
+      docGrid.appendChild(card);
+    });
+  }
+
+  function showErrorState(){
+    docGrid.innerHTML = '';
+    emptyState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    resultCount.innerHTML = `<strong>—</strong> documents`;
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  // ============================================================
+  // SEARCH / FILTER (client-side over already-fetched docs)
+  // ============================================================
+  const searchInput = document.getElementById('searchInput');
+  const moduleFilter = document.getElementById('moduleFilter');
+
+  function applyFilters(){
+    const q = searchInput.value.trim().toLowerCase();
+    const mod = moduleFilter.value;
+
+    let filtered = ALL_DOCS;
+    if(mod){
+      filtered = filtered.filter(d => String(d.module_number) === mod);
+    }
+    if(q){
+      filtered = filtered.filter(d =>
+        (d.title || '').toLowerCase().includes(q) ||
+        (d.topic || '').toLowerCase().includes(q) ||
+        (d.content_text || '').toLowerCase().includes(q)
+      );
+    }
+    renderDocs(filtered);
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  moduleFilter.addEventListener('change', applyFilters);
+
+  // ============================================================
+  // INIT — load, then reveal page only once data is ready
+  // ============================================================
+  (async function init(){
+    setLoadProgress(5);
+    const docs = await fetchDocuments();
+
+    if(docs === null){
+      showErrorState();
+    } else {
+      ALL_DOCS = docs;
+      renderDocs(ALL_DOCS);
+    }
+
+    hideLoader();
+  })();
+
+  // ============================================================
+  // SUGGESTION FORM
+  // ============================================================
+  const suggestForm = document.getElementById('suggestForm');
+  const formStatus = document.getElementById('formStatus');
+  const formStatusText = document.getElementById('formStatusText');
+  const suggestSubmitBtn = document.getElementById('suggestSubmitBtn');
+
+  function showFormStatus(type, text){
+    formStatus.classList.remove('success','error');
+    formStatus.classList.add('show', type);
+    formStatusText.textContent = text;
+  }
+
+  suggestForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = document.getElementById('sMessage').value.trim();
+    if(!message){ return; }
+
+    suggestSubmitBtn.disabled = true;
+    suggestSubmitBtn.textContent = 'Sending…';
+
+    const payload = {
+      name: document.getElementById('sName').value.trim() || null,
+      email: document.getElementById('sEmail').value.trim() || null,
+      category: document.getElementById('sCategory').value,
+      message
+    };
+
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/suggestions`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if(!res.ok) throw new Error('Submit failed: ' + res.status);
+
+      showFormStatus('success', 'Sent — thank you!');
+      suggestForm.reset();
+    } catch(err){
+      console.error(err);
+      showFormStatus('error', "Couldn't send. Try again or email directly.");
+    } finally {
+      suggestSubmitBtn.disabled = false;
+      suggestSubmitBtn.textContent = 'Send suggestion →';
+    }
+  });
+</script>
+
+</body>
+</html>

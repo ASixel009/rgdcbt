@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDG 205 Cloud — Admin</title>
+<style>
+  :root{
+    --black: #050505;
+    --black-soft: #0d0d0e;
+    --ink: #141416;
+    --glass-1: rgba(255,255,255,0.06);
+    --glass-2: rgba(255,255,255,0.10);
+    --glass-border: rgba(255,255,255,0.14);
+    --glass-border-strong: rgba(255,255,255,0.28);
+    --white: #f5f5f7;
+    --white-dim: rgba(245,245,247,0.62);
+    --white-faint: rgba(245,245,247,0.38);
+    --hairline: rgba(255,255,255,0.09);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --green: #34d399;
+    --green-glow: rgba(52,211,153,0.18);
+    --red: #f87171;
+    --red-glow: rgba(248,113,113,0.18);
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    font-family: "Neue Haas Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--black); color: var(--white);
+    min-height:100vh; overflow-x:hidden; -webkit-font-smoothing: antialiased;
+  }
+
+  .field{
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events:none;
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 0%, rgba(255,255,255,0.07), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 15%, rgba(255,255,255,0.05), transparent 55%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(255,255,255,0.045), transparent 60%),
+      var(--black);
+  }
+  .grain{
+    position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection{ background: rgba(255,255,255,0.25); }
+  a{ text-decoration:none; color:inherit; }
+
+  .glass{
+    position:relative;
+    background: linear-gradient(155deg, var(--glass-2), var(--glass-1));
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.18) inset, 0 -1px 0 rgba(0,0,0,0.4) inset,
+      0 24px 60px -20px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .glass::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:50%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), transparent);
+    pointer-events:none;
+  }
+
+  .wrap{ max-width: 980px; margin:0 auto; padding: 0 24px; position:relative; z-index:2; }
+  @media (max-width:600px){ .wrap{ padding:0 18px; } }
+
+  .btn{
+    appearance:none; border:none; cursor:pointer; font-family:inherit;
+    border-radius:999px; font-weight:700; letter-spacing:0.01em;
+    transition: all 0.22s var(--ease);
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn-primary{ background:var(--white); color:#050505; box-shadow:0 10px 28px -10px rgba(255,255,255,0.4); font-size:14.5px; padding:14px 24px; }
+  .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 14px 34px -8px rgba(255,255,255,0.55); }
+  .btn-primary:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+  .btn-ghost{ background:rgba(255,255,255,0.05); color:var(--white); border:1px solid var(--glass-border); font-size:13.5px; padding:11px 20px; }
+  .btn-ghost:hover{ background:rgba(255,255,255,0.1); border-color:var(--glass-border-strong); }
+
+  /* ============ LOGIN SCREEN ============ */
+  #loginScreen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    position:relative; z-index:2; padding:24px;
+  }
+  .login-card{ width:100%; max-width:400px; padding:42px 36px; text-align:center; }
+  @media (max-width:480px){ .login-card{ padding:32px 24px; } }
+
+  .login-icon{
+    width:52px; height:52px; border-radius:50%; margin:0 auto 22px;
+    border:1px solid var(--glass-border-strong); display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,0.04);
+  }
+  .login-card h1{ font-size:22px; font-weight:700; margin-bottom:8px; }
+  .login-card p.sub{ font-size:13.5px; color:var(--white-faint); margin-bottom:30px; line-height:1.5; }
+
+  .code-input{
+    width:100%; padding:16px 18px; border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04); border:1px solid var(--hairline);
+    color:var(--white); font-family:inherit; font-size:15px; text-align:center;
+    letter-spacing:0.02em; outline:none; margin-bottom:16px;
+    transition: all 0.2s var(--ease);
+  }
+  .code-input:focus{ border-color:var(--glass-border-strong); background:rgba(255,255,255,0.07); }
+  .code-input::placeholder{ color:var(--white-faint); }
+
+  .login-status{
+    display:none; align-items:center; justify-content:center; gap:9px;
+    padding: 11px 16px; border-radius:999px; font-size:13px; font-weight:600;
+    margin-bottom:16px;
+  }
+  .login-status.show{ display:inline-flex; }
+  .login-status.success{ background: var(--green-glow); color: var(--green); border:1px solid rgba(52,211,153,0.35); }
+  .login-status.error{ background: var(--red-glow); color: var(--red); border:1px solid rgba(248,113,113,0.35); }
+  .login-status .led{ width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; }
+
+  /* ============ ADMIN APP (post-login) ============ */
+  #adminApp{ display:none; position:relative; z-index:2; padding: 30px 0 70px; }
+  #adminApp.show{ display:block; }
+
+  .admin-topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:16px; flex-wrap:wrap; }
+  .admin-welcome{ display:flex; align-items:center; gap:12px; }
+  .admin-welcome .dot{ width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green-glow); }
+  .admin-welcome .text{ font-size:13.5px; }
+  .admin-welcome .text .name{ font-weight:700; }
+  .admin-welcome .text .role{ color:var(--white-faint); font-size:12px; margin-left:6px; }
+
+  .tab-row{ display:flex; gap:6px; background:rgba(255,255,255,0.04); border:1px solid var(--hairline); border-radius:999px; padding:4px; width:fit-content; margin-bottom:28px; }
+  .tab-btn{ appearance:none; border:none; cursor:pointer; font-family:inherit; background:transparent; color:var(--white-faint); font-size:13px; font-weight:600; padding:10px 20px; border-radius:999px; transition: all 0.22s var(--ease); }
+  .tab-btn:hover{ color:var(--white); }
+  .tab-btn.active{ background:var(--white); color:#050505; }
+
+  .admin-panel{ display:none; }
+  .admin-panel.active{ display:block; }
+
+  /* ============ UPLOAD PANEL ============ */
+  .upload-zone{
+    padding: 44px 28px; text-align:center; margin-bottom:24px;
+    border: 1.5px dashed var(--glass-border-strong); cursor:pointer;
+    transition: all 0.25s var(--ease);
+  }
+  .upload-zone:hover, .upload-zone.dragover{ background: rgba(255,255,255,0.07); border-color: var(--white); }
+  .upload-zone .icon{ font-size:30px; margin-bottom:14px; opacity:0.5; }
+  .upload-zone h3{ font-size:16px; font-weight:700; margin-bottom:6px; }
+  .upload-zone p{ font-size:13px; color:var(--white-faint); }
+  #fileInput{ display:none; }
+
+  .upload-form{ padding:28px 26px; margin-bottom:24px; display:none; }
+  .upload-form.show{ display:block; }
+  .upload-form-row{ display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .upload-field{ flex:1; min-width:160px; display:flex; flex-direction:column; gap:7px; }
+  .upload-field label{ font-size:11px; color:var(--white-faint); text-transform:uppercase; letter-spacing:0.06em; font-weight:600; }
+  .upload-field input, .upload-field select{
+    padding:12px 16px; border-radius: var(--radius-sm); background: rgba(255,255,255,0.04);
+    border:1px solid var(--hairline); color:var(--white); font-family:inherit; font-size:13.5px; outline:none;
+  }
+  .upload-field input:focus, .upload-field select:focus{ border-color:var(--glass-border-strong); }
+
+  .selected-file{ display:flex; align-items:center; gap:12px; padding:14px 16px; background:rgba(255,255,255,0.04); border-radius:var(--radius-sm); margin-bottom:18px; font-size:13px; }
+  .selected-file .name{ flex:1; color:var(--white-dim); }
+  .selected-file .size{ color:var(--white-faint); font-size:12px; }
+
+  .progress-track{ height:6px; border-radius:6px; background:var(--hairline); overflow:hidden; margin-bottom:14px; display:none; }
+  .progress-track.show{ display:block; }
+  .progress-fill{ height:100%; background:var(--white); border-radius:6px; transition: width 0.3s var(--ease); width:0%; }
+
+  .upload-status{
+    display:none; align-items:center; gap:10px; padding:12px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; margin-bottom:14px;
+  }
+  .upload-status.show{ display:inline-flex; }
+  .upload-status.success{ background: var(--green-glow); color: var(--green); border:1px solid rgba(52,211,153,0.35); }
+  .upload-status.error{ background: var(--red-glow); color: var(--red); border:1px solid rgba(248,113,113,0.35); }
+  .upload-status .led{ width:7px; height:7px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; flex-shrink:0; }
+
+  /* ============ LIBRARY LIST ============ */
+  .lib-item{
+    display:flex; align-items:center; gap:16px; padding:18px 22px;
+    border:1px solid var(--hairline); border-radius: var(--radius-md);
+    background: rgba(255,255,255,0.03); margin-bottom:10px;
+  }
+  .lib-item .info{ flex:1; min-width:0; }
+  .lib-item .title{ font-size:14.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lib-item .meta{ font-size:12px; color:var(--white-faint); margin-top:3px; }
+  .lib-item .mod-badge{ font-size:10.5px; font-weight:800; color:var(--white-faint); border:1px solid var(--glass-border); border-radius:999px; padding:5px 12px; white-space:nowrap; }
+
+  /* ============ SUGGESTIONS INBOX ============ */
+  .suggestion-item{
+    padding: 20px 22px; border:1px solid var(--hairline); border-radius: var(--radius-md);
+    background: rgba(255,255,255,0.03); margin-bottom:10px;
+  }
+  .suggestion-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
+  .suggestion-from{ font-size:13.5px; font-weight:700; }
+  .suggestion-from .email{ font-weight:400; color:var(--white-faint); font-size:12px; margin-left:8px; }
+  .suggestion-cat{ font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--white-faint); border:1px solid var(--glass-border); border-radius:999px; padding:5px 11px; white-space:nowrap; }
+  .suggestion-msg{ font-size:13.5px; color:var(--white-dim); line-height:1.55; margin-bottom:12px; }
+  .suggestion-foot{ display:flex; justify-content:space-between; align-items:center; }
+  .suggestion-date{ font-size:11.5px; color:var(--white-faint); }
+  .suggestion-status-pill{
+    font-size:10.5px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase;
+    padding:5px 12px; border-radius:999px; cursor:pointer; border:1px solid var(--glass-border);
+    background:transparent; color:var(--white-faint); font-family:inherit;
+  }
+  .suggestion-status-pill[data-status="new"]{ color: var(--red); border-color: rgba(248,113,113,0.35); }
+  .suggestion-status-pill[data-status="resolved"]{ color: var(--green); border-color: rgba(52,211,153,0.35); }
+
+  .state-box{ text-align:center; padding:50px 24px; }
+  .state-box .icon{ font-size:30px; margin-bottom:12px; opacity:0.5; }
+  .state-box h3{ font-size:15.5px; font-weight:700; margin-bottom:6px; }
+  .state-box p{ font-size:13px; color:var(--white-faint); }
+
+  .hidden{ display:none !important; }
+
+  /* mini loader for inline async actions */
+  .mini-spinner{
+    width:16px; height:16px; border-radius:50%;
+    border:2px solid rgba(255,255,255,0.2); border-top-color:var(--white);
+    animation: spin 0.8s linear infinite; display:inline-block;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="field"></div>
+<div class="grain"></div>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="loginScreen">
+  <div class="glass login-card">
+    <div class="login-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <h1 id="loginTitle">Admin access</h1>
+    <p class="sub">Enter your access code to manage the RDG 205 library.</p>
+
+    <input type="password" id="codeInput" class="code-input" placeholder="Enter access code" autocomplete="off">
+    <div class="login-status" id="loginStatus"><span class="led"></span><span id="loginStatusText"></span></div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%;">Sign in →</button>
+  </div>
+</div>
+
+<!-- ============ ADMIN APP ============ -->
+<div id="adminApp">
+  <div class="wrap">
+    <div class="admin-topbar">
+      <div class="admin-welcome">
+        <span class="dot"></span>
+        <span class="text">Welcome, <span class="name" id="welcomeName">—</span><span class="role" id="welcomeRole"></span></span>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <a href="./cloud.html" class="btn btn-ghost">View library ↗</a>
+        <button class="btn btn-ghost" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" data-tab="upload">Upload</button>
+      <button class="tab-btn" data-tab="library">Library</button>
+      <button class="tab-btn" data-tab="suggestions">Suggestions <span id="suggestionBadge"></span></button>
+    </div>
+
+    <!-- ============ UPLOAD TAB ============ -->
+    <div class="admin-panel active" id="panel-upload">
+      <div class="glass upload-zone" id="uploadZone">
+        <div class="icon">⇧</div>
+        <h3>Drop a PDF here, or click to browse</h3>
+        <p>It'll be uploaded to storage and indexed for search automatically.</p>
+        <input type="file" id="fileInput" accept="application/pdf">
+      </div>
+
+      <div class="glass upload-form" id="uploadForm">
+        <div class="selected-file">
+          <span class="name" id="selectedFileName">—</span>
+          <span class="size" id="selectedFileSize"></span>
+        </div>
+
+        <div class="upload-form-row">
+          <div class="upload-field">
+            <label for="upTitle">Title</label>
+            <input type="text" id="upTitle" placeholder="e.g. Compton Scattering Notes">
+          </div>
+          <div class="upload-field">
+            <label for="upModule">Module</label>
+            <select id="upModule">
+              <option value="1">01 — Conductors & Semiconductors</option>
+              <option value="2">02 — Energy & Energy Transfer</option>
+              <option value="3">03 — Radioactivity & Half-Life</option>
+              <option value="4">04 — Bohr's Atomic Model</option>
+              <option value="5">05 — X-ray Production</option>
+              <option value="6">06 — Photon Interactions</option>
+              <option value="7">07 — Quantities & Dosimetry</option>
+              <option value="8">08 — Radiation Protection</option>
+            </select>
+          </div>
+        </div>
+        <div class="upload-form-row">
+          <div class="upload-field">
+            <label for="upTopic">Topic (optional)</label>
+            <input type="text" id="upTopic" placeholder="e.g. Photon interactions with matter">
+          </div>
+        </div>
+
+        <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="upload-status" id="uploadStatus"><span class="led"></span><span id="uploadStatusText"></span></div>
+
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" id="confirmUploadBtn">Upload →</button>
+          <button class="btn btn-ghost" id="cancelUploadBtn">Cancel</button>
+        </div>
+      </div>
+
+      <p style="font-size:12px; color:var(--white-faint); line-height:1.6;">
+        Note: actual file upload to Backblaze B2 requires a small server-side relay (browsers can't safely hold storage secret keys). See <code>DEPLOY.md</code> for the upload relay setup — this form is fully wired to call it once deployed.
+      </p>
+    </div>
+
+    <!-- ============ LIBRARY TAB ============ -->
+    <div class="admin-panel" id="panel-library">
+      <div id="libraryList"></div>
+      <div class="state-box hidden" id="libraryEmpty">
+        <div class="icon">○</div>
+        <h3>No documents uploaded yet</h3>
+        <p>Use the Upload tab to add your first PDF.</p>
+      </div>
+    </div>
+
+    <!-- ============ SUGGESTIONS TAB ============ -->
+    <div class="admin-panel" id="panel-suggestions">
+      <div id="suggestionsList"></div>
+      <div class="state-box hidden" id="suggestionsEmpty">
+        <div class="icon">○</div>
+        <h3>No suggestions yet</h3>
+        <p>Submissions from the cloud page's contact form will appear here.</p>
+      </div>
+      <div class="state-box hidden" id="suggestionsLoading">
+        <div class="mini-spinner" style="margin:0 auto 12px;"></div>
+        <p>Loading suggestions…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const SUPABASE_URL = "https://ttqzunjjicflxxvvmvnr.supabase.co";
+  const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+  const EDGE_FN_LOGIN = `${SUPABASE_URL}/functions/v1/admin-login`;
+  const EDGE_FN_SUGGESTIONS = `${SUPABASE_URL}/functions/v1/admin-get-suggestions`;
+
+  let sessionToken = null;
+  let sessionRole = null;
+
+  // ============================================================
+  // LOGIN
+  // ============================================================
+  const codeInput = document.getElementById('codeInput');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginStatus = document.getElementById('loginStatus');
+  const loginStatusText = document.getElementById('loginStatusText');
+  const loginScreen = document.getElementById('loginScreen');
+  const adminApp = document.getElementById('adminApp');
+
+  function showLoginStatus(type, text){
+    loginStatus.classList.remove('success','error');
+    loginStatus.classList.add('show', type);
+    loginStatusText.textContent = text;
+  }
+
+  async function attemptLogin(){
+    const code = codeInput.value.trim();
+    if(!code) return;
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Checking…';
+
+    try{
+      const res = await fetch(EDGE_FN_LOGIN, {
+        method:'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+
+      if(!res.ok || !data.token){
+        showLoginStatus('error', 'Invalid code. Try again.');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign in →';
+        return;
+      }
+
+      sessionToken = data.token;
+      sessionRole = data.role;
+      sessionStorage.setItem('rdg_admin_token', sessionToken);
+      sessionStorage.setItem('rdg_admin_role', sessionRole);
+      sessionStorage.setItem('rdg_admin_name', data.welcomeName || '');
+
+      showLoginStatus('success', 'Welcome — loading panel…');
+      setTimeout(enterAdminApp, 500);
+    } catch(err){
+      console.error(err);
+      showLoginStatus('error', "Couldn't reach the server. Try again.");
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Sign in →';
+    }
+  }
+
+  loginBtn.addEventListener('click', attemptLogin);
+  codeInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') attemptLogin(); });
+
+  function enterAdminApp(){
+    const name = sessionStorage.getItem('rdg_admin_name') || 'Admin';
+    const role = sessionStorage.getItem('rdg_admin_role') || '';
+    document.getElementById('welcomeName').textContent = name;
+    document.getElementById('welcomeRole').textContent = role ? `· ${role}` : '';
+
+    loginScreen.classList.add('hidden');
+    adminApp.classList.add('show');
+
+    loadLibrary();
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    sessionStorage.removeItem('rdg_admin_token');
+    sessionStorage.removeItem('rdg_admin_role');
+    sessionStorage.removeItem('rdg_admin_name');
+    sessionToken = null;
+    adminApp.classList.remove('show');
+    loginScreen.classList.remove('hidden');
+    codeInput.value = '';
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Sign in →';
+    loginStatus.classList.remove('show');
+  });
+
+  // restore session if still valid (sessionStorage = cleared when tab closes)
+  (function restoreSession(){
+    const t = sessionStorage.getItem('rdg_admin_token');
+    if(t){
+      sessionToken = t;
+      sessionRole = sessionStorage.getItem('rdg_admin_role');
+      enterAdminApp();
+    }
+  })();
+
+  // ============================================================
+  // TABS
+  // ============================================================
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+
+      if(btn.dataset.tab === 'suggestions') loadSuggestions();
+      if(btn.dataset.tab === 'library') loadLibrary();
+    });
+  });
+
+  // ============================================================
+  // UPLOAD FLOW (UI + metadata insert; actual file PUT to B2
+  // happens via a small server relay — see DEPLOY.md)
+  // ============================================================
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadForm = document.getElementById('uploadForm');
+  const selectedFileName = document.getElementById('selectedFileName');
+  const selectedFileSize = document.getElementById('selectedFileSize');
+  let selectedFile = null;
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if(e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if(fileInput.files[0]) handleFileSelect(fileInput.files[0]); });
+
+  function handleFileSelect(file){
+    if(file.type !== 'application/pdf'){
+      alert('Please select a PDF file.');
+      return;
+    }
+    selectedFile = file;
+    selectedFileName.textContent = file.name;
+    selectedFileSize.textContent = (file.size / (1024*1024)).toFixed(2) + ' MB';
+    document.getElementById('upTitle').value = file.name.replace(/\.pdf$/i, '');
+    uploadForm.classList.add('show');
+  }
+
+  document.getElementById('cancelUploadBtn').addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    uploadForm.classList.remove('show');
+  });
+
+  const progressTrack = document.getElementById('progressTrack');
+  const progressFill = document.getElementById('progressFill');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const uploadStatusText = document.getElementById('uploadStatusText');
+
+  function showUploadStatus(type, text){
+    uploadStatus.classList.remove('success','error');
+    uploadStatus.classList.add('show', type);
+    uploadStatusText.textContent = text;
+  }
+
+  document.getElementById('confirmUploadBtn').addEventListener('click', async () => {
+    if(!selectedFile) return;
+    const title = document.getElementById('upTitle').value.trim();
+    if(!title){ showUploadStatus('error', 'Please enter a title.'); return; }
+
+    progressTrack.classList.add('show');
+    progressFill.style.width = '15%';
+    showUploadStatus('success', 'Uploading…');
+
+    // NOTE: This calls an upload-relay endpoint (Edge Function or small
+    // server) that accepts the file + metadata, pushes the file to B2,
+    // and inserts the row into `documents` using the service_role key.
+    // See DEPLOY.md → "Upload relay" for the function to deploy.
+    try{
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('title', title);
+      formData.append('module_number', document.getElementById('upModule').value);
+      formData.append('topic', document.getElementById('upTopic').value.trim());
+      formData.append('token', sessionToken);
+
+      progressFill.style.width = '55%';
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-upload-pdf`, {
+        method: 'POST',
+        body: formData
+      });
+
+      progressFill.style.width = '90%';
+      if(!res.ok) throw new Error('Upload failed: ' + res.status);
+
+      progressFill.style.width = '100%';
+      showUploadStatus('success', 'Uploaded successfully!');
+      setTimeout(() => {
+        uploadForm.classList.remove('show');
+        progressTrack.classList.remove('show');
+        progressFill.style.width = '0%';
+        selectedFile = null;
+        fileInput.value = '';
+        loadLibrary();
+      }, 1200);
+    } catch(err){
+      console.error(err);
+      showUploadStatus('error', "Upload failed — check the upload relay is deployed.");
+      progressTrack.classList.remove('show');
+    }
+  });
+
+  // ============================================================
+  // LIBRARY LIST
+  // ============================================================
+  async function loadLibrary(){
+    const listEl = document.getElementById('libraryList');
+    const emptyEl = document.getElementById('libraryEmpty');
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/documents?select=*&order=uploaded_at.desc`, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+      });
+      const docs = await res.json();
+
+      listEl.innerHTML = '';
+      if(!docs.length){ emptyEl.classList.remove('hidden'); return; }
+      emptyEl.classList.add('hidden');
+
+      docs.forEach(doc => {
+        const row = document.createElement('div');
+        row.className = 'lib-item';
+        row.innerHTML = `
+          <span class="mod-badge">Mod ${String(doc.module_number||'—').padStart(2,'0')}</span>
+          <div class="info">
+            <div class="title">${doc.title}</div>
+            <div class="meta">${doc.topic || ''} ${doc.page_count ? '· ' + doc.page_count + ' pages' : ''}</div>
+          </div>
+        `;
+        listEl.appendChild(row);
+      });
+    } catch(err){
+      console.error(err);
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+    }
+  }
+
+  // ============================================================
+  // SUGGESTIONS INBOX
+  // ============================================================
+  async function loadSuggestions(){
+    const listEl = document.getElementById('suggestionsList');
+    const emptyEl = document.getElementById('suggestionsEmpty');
+    const loadingEl = document.getElementById('suggestionsLoading');
+
+    listEl.innerHTML = '';
+    emptyEl.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+
+    try{
+      const res = await fetch(EDGE_FN_SUGGESTIONS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: sessionToken })
+      });
+      const data = await res.json();
+      loadingEl.classList.add('hidden');
+
+      if(!res.ok || !data.suggestions){
+        listEl.innerHTML = '<div class="state-box"><p>Could not load suggestions. Is the Edge Function deployed?</p></div>';
+        return;
+      }
+
+      const newCount = data.suggestions.filter(s => s.status === 'new').length;
+      document.getElementById('suggestionBadge').textContent = newCount > 0 ? `(${newCount})` : '';
+
+      if(!data.suggestions.length){ emptyEl.classList.remove('hidden'); return; }
+
+      data.suggestions.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item';
+        const date = new Date(s.submitted_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+        item.innerHTML = `
+          <div class="suggestion-top">
+            <div>
+              <span class="suggestion-from">${s.name || 'Anonymous'}</span>
+              ${s.email ? `<span class="email">${s.email}</span>` : ''}
+            </div>
+            <span class="suggestion-cat">${s.category}</span>
+          </div>
+          <div class="suggestion-msg">${escapeHtml(s.message)}</div>
+          <div class="suggestion-foot">
+            <span class="suggestion-date">${date}</span>
+            <button class="suggestion-status-pill" data-status="${s.status}" data-id="${s.id}">${s.status}</button>
+          </div>
+        `;
+        listEl.appendChild(item);
+      });
+
+      // toggle status on click: new -> read -> resolved -> new
+      listEl.querySelectorAll('.suggestion-status-pill').forEach(pill => {
+        pill.addEventListener('click', async () => {
+          const current = pill.dataset.status;
+          const next = current === 'new' ? 'read' : current === 'read' ? 'resolved' : 'new';
+          pill.textContent = '…';
+          try{
+            await fetch(EDGE_FN_SUGGESTIONS, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: sessionToken, action: 'update_status', id: pill.dataset.id, status: next })
+            });
+            pill.dataset.status = next;
+            pill.textContent = next;
+          } catch(err){
+            pill.textContent = current;
+          }
+        });
+      });
+    } catch(err){
+      console.error(err);
+      loadingEl.classList.add('hidden');
+      listEl.innerHTML = '<div class="state-box"><p>Could not load suggestions.</p></div>';
+    }
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+</script>
+
+</body>
+</html>
